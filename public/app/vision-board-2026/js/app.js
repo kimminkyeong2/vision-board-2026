@@ -1,3 +1,5 @@
+import { Storage } from './storage.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     const authOverlay = document.getElementById('auth-overlay');
@@ -26,14 +28,18 @@ document.addEventListener('DOMContentLoaded', () => {
             authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
             document.getElementById('user-title').innerText = `'${user}'님의 2026 VISION BOARD`;
-            loadBoard();
+
+            // Initialize Firestore Realtime Listener
+            Storage.init((projects) => {
+                loadBoard();
+            });
         } else {
             authOverlay.classList.remove('hidden');
             mainApp.classList.add('hidden');
         }
     };
 
-    loginBtn.addEventListener('click', () => {
+    loginBtn.addEventListener('click', async () => {
         const id = loginId.value.trim();
         const pw = loginPw.value.trim();
 
@@ -42,17 +48,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Simulating Registration & Login (If new user, register them)
-        const data = Storage.getData();
-        if (!data.users[id]) {
-            Storage.registerUser(id, pw);
+        // Check if user exists, if not register
+        // First try to validate (login)
+        let isValid = await Storage.validateUser(id, pw);
+
+        if (!isValid) {
+            // If validation failed, maybe user doesn't exist? Try to register
+            // Note: In real app, we should check if user exists first.
+            // Here we assume if validate fails, we try to register if ID is new.
+            // But Storage.validateUser returns false for wrong password OR non-existent user.
+            // Let's try to register. If ID taken, registerUser returns false.
+            const registered = await Storage.registerUser(id, pw);
+            if (registered) {
+                alert('새로운 유저로 등록되었습니다! 환영합니다.');
+                isValid = true;
+            } else {
+                // Register failed means ID exists, so password was wrong
+                alert('이미 존재하는 아이디이며, 비밀번호가 일치하지 않습니다.');
+                return;
+            }
         }
 
-        if (Storage.validateUser(id, pw)) {
+        if (isValid) {
             sessionStorage.setItem('vboard_user', id);
             checkAuth();
-        } else {
-            alert('비밀번호가 일치하지 않습니다.');
         }
     });
 

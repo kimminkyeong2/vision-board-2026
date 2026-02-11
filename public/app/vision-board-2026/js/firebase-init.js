@@ -1,6 +1,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBLjX6_Ay-UsKUsOtMN53rSxfHyXtDxvIg",
@@ -14,5 +15,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
+export { db, analytics }; // Export db for usage in storage.js
 
 console.log("Firebase initialized successfully!");
