@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sticker.style.left = `${project.x || 0}px`;
             sticker.style.top = `${project.y || 0}px`;
             sticker.style.width = `${project.size || 200}px`; // Added size
-            sticker.style.zIndex = project.zIndex || 1; // Added z-index
+            sticker.style.zIndex = project.zIndex || 10; // Default to 10
             sticker.dataset.id = project.id;
 
             const total = project.todos.length;
@@ -132,12 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             sticker.addEventListener('mousedown', (e) => {
                 if (e.target.closest('.quick-tools')) return;
-
-                // Bring to front on any click/mousedown
-                const projects = Storage.getProjects();
-                const maxZ = Math.max(...projects.map(p => p.zIndex || 1), 0);
-                Storage.updateProject(project.id, { zIndex: maxZ + 1 });
-                sticker.style.zIndex = maxZ + 1;
 
                 isDragging = true;
                 startX = e.clientX;
@@ -213,16 +207,27 @@ document.addEventListener('DOMContentLoaded', () => {
             frontBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const projects = Storage.getProjects();
-                const maxZ = Math.max(...projects.map(p => p.zIndex || 1), 0);
-                Storage.updateProject(project.id, { zIndex: maxZ + 1 });
+                const currentMaxZ = Math.max(...projects.map(p => p.zIndex || 10), 10);
+                Storage.updateProject(project.id, { zIndex: currentMaxZ + 1 });
                 loadBoard();
             });
 
             backBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const projects = Storage.getProjects();
-                const minZ = Math.min(...projects.map(p => p.zIndex || 1), 0);
-                Storage.updateProject(project.id, { zIndex: minZ - 1 });
+                const currentMinZ = Math.min(...projects.map(p => p.zIndex || 10), 10);
+
+                if (currentMinZ > 10) {
+                    Storage.updateProject(project.id, { zIndex: currentMinZ - 1 });
+                } else {
+                    // If already at minimum (10), shift everyone else UP instead
+                    projects.forEach(p => {
+                        if (p.id !== project.id) {
+                            Storage.updateProject(p.id, { zIndex: (p.zIndex || 10) + 1 });
+                        }
+                    });
+                    Storage.updateProject(project.id, { zIndex: 10 });
+                }
                 loadBoard();
             });
 

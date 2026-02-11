@@ -453,7 +453,6 @@ header:hover .logo {
 .sticker:hover {
     /* Maintain center anchor while scaling */
     transform: translate(-50%, -50%) scale(1.15) rotate(0deg) !important;
-    z-index: 100 !important;
     filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.23));
 }
 
