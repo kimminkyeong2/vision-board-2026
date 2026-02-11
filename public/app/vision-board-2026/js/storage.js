@@ -108,8 +108,8 @@ const Storage = {
                 userId: sessionStorage.getItem('vboard_user'),
                 ...project, // includes image dataURL
                 todos: [],
-                x: Math.max(50, Math.min(window.innerWidth - 250, Math.random() * (window.innerWidth - 300) + 150)),
-                y: Math.max(150, Math.min(window.innerHeight - 250, Math.random() * (window.innerHeight - 300) + 200)),
+                x: 4500 + Math.random() * 1000, // Center around 5000, 5000
+                y: 4500 + Math.random() * 1000,
                 zIndex: 10 // Default safely above background
             };
 
@@ -147,13 +147,41 @@ const Storage = {
     },
 
     // --- Settings (Local for now or User Doc) ---
-    getSettings: function () {
+    // --- Settings (Stored in User Document) ---
+    getSettings: async function () {
+        const userId = sessionStorage.getItem('vboard_user');
+        if (!userId) return LOCAL_CACHE.settings;
+
+        try {
+            const userRef = doc(db, COLLECTIONS.USERS, userId);
+            const userSnap = await getDoc(userRef);
+
+            if (userSnap.exists() && userSnap.data().settings) {
+                LOCAL_CACHE.settings = userSnap.data().settings;
+                return userSnap.data().settings;
+            }
+        } catch (e) {
+            console.error("Get Settings Error", e);
+        }
+
         return LOCAL_CACHE.settings;
     },
 
-    saveSettings: function (settings) {
+    saveSettings: async function (settings) {
+        const userId = sessionStorage.getItem('vboard_user');
+        if (!userId) return;
+
         LOCAL_CACHE.settings = { ...LOCAL_CACHE.settings, ...settings };
-        // Ideally save to user doc, skip for now to keep simple
+
+        try {
+            const userRef = doc(db, COLLECTIONS.USERS, userId);
+            // Use setDoc with merge to create field if it doesn't exist
+            await setDoc(userRef, {
+                settings: LOCAL_CACHE.settings
+            }, { merge: true });
+        } catch (e) {
+            console.error("Save Settings Error", e);
+        }
     }
 };
 

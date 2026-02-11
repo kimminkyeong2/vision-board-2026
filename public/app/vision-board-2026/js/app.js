@@ -81,12 +81,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Vision Board Logic ---
-    const loadBoard = () => {
-        const settings = Storage.getSettings();
+    // --- Vision Board Logic ---
+    const loadBoard = async () => {
+        const settings = await Storage.getSettings();
         document.body.style.backgroundColor = settings.bgColor;
         bgColorPicker.value = settings.bgColor;
 
         const projects = Storage.getProjects();
+
+        // Migration: Move existing stickers from top-left (0,0) to center (4500,4500)
+        let migratedCount = 0;
+        projects.forEach(p => {
+            if ((p.x < 2000 && p.y < 2000) || !p.x) {
+                const newX = (p.x || 0) + 4500;
+                const newY = (p.y || 0) + 4500;
+                Storage.updateProject(p.id, { x: newX, y: newY });
+                p.x = newX; // Update local reference for immediate render
+                p.y = newY;
+                migratedCount++;
+            }
+        });
+
+        if (migratedCount > 0) {
+            console.log(`Migrated ${migratedCount} stickers to infinite canvas center.`);
+        }
+
         renderStickers(projects);
     };
 
@@ -99,8 +118,85 @@ document.addEventListener('DOMContentLoaded', () => {
         Storage.saveSettings({ bgColor: e.target.value });
     });
 
+    // --- Infinite Canvas: Pan & Zoom ---
+    let canvasX = -4500; // Start centered (10000px canvas, center at -4500)
+    let canvasY = -4500;
+    let canvasScale = 1;
+    let isPanning = false;
+    let panStartX, panStartY, panInitialX, panInitialY;
+
+    // Create canvas wrapper
+    const createCanvasWrapper = () => {
+        const existingCanvas = board.querySelector('.board-canvas');
+        if (existingCanvas) return existingCanvas;
+
+        const canvas = document.createElement('div');
+        canvas.className = 'board-canvas';
+        board.appendChild(canvas);
+        updateCanvasTransform();
+        return canvas;
+    };
+
+    const updateCanvasTransform = () => {
+        const canvas = board.querySelector('.board-canvas');
+        if (canvas) {
+            canvas.style.transform = `translate(${canvasX}px, ${canvasY}px) scale(${canvasScale})`;
+        }
+    };
+
+    // Pan with mouse drag (on board background, not on stickers)
+    board.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.sticker')) return; // Don't pan when clicking stickers
+
+        isPanning = true;
+        board.classList.add('panning');
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panInitialX = canvasX;
+        panInitialY = canvasY;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+
+        const dx = e.clientX - panStartX;
+        const dy = e.clientY - panStartY;
+        canvasX = panInitialX + dx;
+        canvasY = panInitialY + dy;
+        updateCanvasTransform();
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isPanning) {
+            isPanning = false;
+            board.classList.remove('panning');
+        }
+    });
+
+    // Zoom with mouse wheel
+    board.addEventListener('wheel', (e) => {
+        e.preventDefault();
+
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.max(0.3, Math.min(3, canvasScale * delta));
+
+        // Zoom towards mouse position
+        const rect = board.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const scaleChange = newScale / canvasScale;
+        canvasX = mouseX - (mouseX - canvasX) * scaleChange;
+        canvasY = mouseY - (mouseY - canvasY) * scaleChange;
+        canvasScale = newScale;
+
+        updateCanvasTransform();
+    }, { passive: false });
+
     const renderStickers = (projects) => {
-        board.innerHTML = '';
+        const canvas = createCanvasWrapper();
+        canvas.innerHTML = '';
+
         projects.forEach(project => {
             const sticker = document.createElement('div');
             sticker.className = 'sticker';
@@ -129,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sticker.innerHTML = `
                 <img src="${project.image}" alt="${project.name}" style="opacity: ${opacity}; filter: ${filter}" draggable="false">
                 <div class="badge">${project.name}${isFinished ? ' ✨' : ''}</div>
-                <div class="quick-tools">
+                <div class="settings-btn" title="설정">⚙️</div>
+                <div class="quick-tools hidden">
                     <div class="tool-row">
                         <label>Size</label>
                         <input type="range" class="size-slider" min="100" max="400" step="1" value="${project.size || 200}">
@@ -149,8 +246,23 @@ document.addEventListener('DOMContentLoaded', () => {
             let isDragging = false;
             let startX, startY, initialX, initialY;
 
+            // Settings Button Toggle
+            const settingsBtn = sticker.querySelector('.settings-btn');
+            const quickTools = sticker.querySelector('.quick-tools');
+
+            settingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                quickTools.classList.toggle('hidden');
+                quickTools.style.opacity = quickTools.classList.contains('hidden') ? '0' : '1';
+                quickTools.style.pointerEvents = quickTools.classList.contains('hidden') ? 'none' : 'all';
+            });
+
+            // Close tools when clicking outside (on canvas)
+            // Note: This requires a global listener, or we just let it toggle.
+            // For now, toggle is simple.
+
             sticker.addEventListener('mousedown', (e) => {
-                if (e.target.closest('.quick-tools')) return;
+                if (e.target.closest('.quick-tools') || e.target.closest('.settings-btn')) return;
 
                 isDragging = true;
                 startX = e.clientX;
@@ -165,8 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const onMouseMove = (e) => {
                 if (!isDragging) return;
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
+                const dx = (e.clientX - startX) / canvasScale;
+                const dy = (e.clientY - startY) / canvasScale;
 
                 if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                     sticker.dataset.moved = 'true';
@@ -260,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             sticker.addEventListener('dblclick', () => openProjectDetail(project.id));
-            board.appendChild(sticker);
+            canvas.appendChild(sticker);
         });
     };
 
@@ -438,11 +550,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const finalImage = (currentSource === 'emoji' || currentSource === 'text') ? imageData : await compressImage(imageData);
 
+            const projectName = document.getElementById('proj-name').value;
+            const startDate = document.getElementById('proj-start').value;
+            const endDate = document.getElementById('proj-end').value;
+            const projectGoal = document.getElementById('proj-goal').value;
+
+            // Validate dates
+            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                alert('시작일이 종료일보다 늦을 수 없습니다. 날짜를 다시 확인해주세요.');
+                return;
+            }
+
             const project = {
-                name: document.getElementById('proj-name').value,
-                startDate: document.getElementById('proj-start').value,
-                endDate: document.getElementById('proj-end').value,
-                goal: document.getElementById('proj-goal').value,
+                name: projectName,
+                startDate: startDate,
+                endDate: endDate,
+                goal: projectGoal,
                 image: finalImage
             };
 
