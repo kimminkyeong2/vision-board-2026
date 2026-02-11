@@ -395,19 +395,66 @@ document.addEventListener('DOMContentLoaded', () => {
         projectModal.classList.remove('hidden');
     });
 
-    // --- Image Compression ---
+    // --- Image Compression & Auto-Crop ---
+    const cropImageWhitespace = (sourceCanvas) => {
+        const ctx = sourceCanvas.getContext('2d');
+        const width = sourceCanvas.width;
+        const height = sourceCanvas.height;
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        let minX = width, minY = height, maxX = 0, maxY = 0;
+        let found = false;
+
+        // Scan for non-transparent pixels
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                // Check alpha channel (every 4th byte)
+                if (data[(y * width + x) * 4 + 3] > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    found = true;
+                }
+            }
+        }
+
+        // If completely empty or full, return original
+        if (!found || (minX === 0 && minY === 0 && maxX === width - 1 && maxY === height - 1)) {
+            return sourceCanvas;
+        }
+
+        // Create cropped canvas with minimal padding
+        const padding = 2;
+        const cropWidth = Math.max(1, (maxX - minX) + padding * 2);
+        const cropHeight = Math.max(1, (maxY - minY) + padding * 2);
+
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cropWidth;
+        cropCanvas.height = cropHeight;
+        const cropCtx = cropCanvas.getContext('2d');
+
+        cropCtx.drawImage(
+            sourceCanvas,
+            minX - padding, minY - padding, cropWidth, cropHeight,
+            0, 0, cropWidth, cropHeight
+        );
+
+        return cropCanvas;
+    };
+
     const compressImage = (imgData, maxWidth = 800, maxHeight = 800) => {
         return new Promise((resolve) => {
-            // If it's a raw URL (not base64), we check if we can actually draw it to compress
-            // But Pinterest often blocks this, so we might just return the raw URL
             const img = new Image();
             img.crossOrigin = 'Anonymous';
             img.onload = () => {
                 try {
-                    const canvas = document.createElement('canvas');
+                    let canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
 
+                    // Resize logic
                     if (width > height) {
                         if (width > maxWidth) {
                             height *= maxWidth / width;
@@ -424,9 +471,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+
+                    // Apply Auto-Crop
+                    canvas = cropImageWhitespace(canvas);
+
+                    resolve(canvas.toDataURL('image/png'));
                 } catch (e) {
-                    resolve(imgData); // Fallback to raw data/URL if canvas export fails
+                    console.warn("Image processing failed, using raw.", e);
+                    resolve(imgData);
                 }
             };
             img.onerror = () => resolve(imgData);
@@ -462,18 +514,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const generateEmojiSticker = (emoji) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 400;
-        canvas.height = 400;
-        const ctx = canvas.getContext('2d');
+        // Create a temporary canvas to measure the emoji bounds
+        const tempCanvas = document.createElement('canvas');
+        const defaultSize = 500;
+        tempCanvas.width = defaultSize;
+        tempCanvas.height = defaultSize;
+        const ctx = tempCanvas.getContext('2d');
 
-        ctx.clearRect(0, 0, 400, 400); // Transparent background
-        ctx.font = '280px serif';
+        // Draw emoji large to get high quality
+        ctx.font = '350px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(emoji || '✨', 200, 215);
+        ctx.fillText(emoji || '✨', defaultSize / 2, defaultSize / 2 + 35); // +35 for baseline adjustment
 
-        return canvas.toDataURL('image/png');
+        // Scan for bounding box
+        const pixels = ctx.getImageData(0, 0, defaultSize, defaultSize).data;
+        let minX = defaultSize, minY = defaultSize, maxX = 0, maxY = 0;
+        let found = false;
+
+        for (let y = 0; y < defaultSize; y++) {
+            for (let x = 0; x < defaultSize; x++) {
+                const alpha = pixels[(y * defaultSize + x) * 4 + 3];
+                if (alpha > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    found = true;
+                }
+            }
+        }
+
+        if (!found) return tempCanvas.toDataURL('image/png'); // Fallback if empty
+
+        // Add small padding
+        const padding = 20;
+        const cropWidth = maxX - minX + padding * 2;
+        const cropHeight = maxY - minY + padding * 2;
+
+        // Create final tight canvas
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = cropWidth;
+        finalCanvas.height = cropHeight;
+        const finalCtx = finalCanvas.getContext('2d');
+
+        finalCtx.drawImage(
+            tempCanvas,
+            minX - padding, minY - padding, cropWidth, cropHeight,
+            0, 0, cropWidth, cropHeight
+        );
+
+        return finalCanvas.toDataURL('image/png');
     };
 
     const generateTextSticker = (text, color) => {

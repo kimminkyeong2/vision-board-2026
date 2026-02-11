@@ -462,18 +462,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const generateEmojiSticker = (emoji) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 400;
-        canvas.height = 400;
-        const ctx = canvas.getContext('2d');
+        // Create a temporary canvas to measure the emoji bounds
+        const tempCanvas = document.createElement('canvas');
+        const defaultSize = 500;
+        tempCanvas.width = defaultSize;
+        tempCanvas.height = defaultSize;
+        const ctx = tempCanvas.getContext('2d');
 
-        ctx.clearRect(0, 0, 400, 400); // Transparent background
-        ctx.font = '280px serif';
+        // Draw emoji large to get high quality
+        ctx.font = '350px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(emoji || '✨', 200, 215);
+        ctx.fillText(emoji || '✨', defaultSize / 2, defaultSize / 2 + 35); // +35 for baseline adjustment
 
-        return canvas.toDataURL('image/png');
+        // Scan for bounding box
+        const pixels = ctx.getImageData(0, 0, defaultSize, defaultSize).data;
+        let minX = defaultSize, minY = defaultSize, maxX = 0, maxY = 0;
+        let found = false;
+
+        for (let y = 0; y < defaultSize; y++) {
+            for (let x = 0; x < defaultSize; x++) {
+                const alpha = pixels[(y * defaultSize + x) * 4 + 3];
+                if (alpha > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    found = true;
+                }
+            }
+        }
+
+        if (!found) return tempCanvas.toDataURL('image/png'); // Fallback if empty
+
+        // Add small padding
+        const padding = 20;
+        const cropWidth = maxX - minX + padding * 2;
+        const cropHeight = maxY - minY + padding * 2;
+
+        // Create final tight canvas
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = cropWidth;
+        finalCanvas.height = cropHeight;
+        const finalCtx = finalCanvas.getContext('2d');
+
+        finalCtx.drawImage(
+            tempCanvas,
+            minX - padding, minY - padding, cropWidth, cropHeight,
+            0, 0, cropWidth, cropHeight
+        );
+
+        return finalCanvas.toDataURL('image/png');
     };
 
     const generateTextSticker = (text, color) => {
