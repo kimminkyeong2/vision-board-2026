@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 비전 보드</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Noto+Sans+KR:wght@300;400;700&family=Caveat:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="icon" href="data:,">
+</head>
+
+<body>
+    <!-- Authentication Overlay -->
+    <div id="auth-overlay" class="overlay">
+        <div class="auth-card glass">
+            <h1>Vision Board 2026</h1>
+            <p>비전보드를 보려면 로그인 해주세요.</p>
+            <div class="input-group">
+                <input type="text" id="login-id" placeholder="아이디(별명)" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <input type="password" id="login-pw" placeholder="비밀번호 4자리" maxlength="4" autocomplete="off">
+            </div>
+            <button id="login-btn">입장하기</button>
+        </div>
+    </div>
+
+    <!-- Main Vision Board Interface -->
+    <main id="main-app" class="hidden">
+        <header class="glass">
+            <div class="logo" id="user-title">2026 VISION BOARD</div>
+            <div class="controls">
+                <button id="add-project-btn" title="프로젝트 추가">+</button>
+                <div class="color-picker-container">
+                    <input type="color" id="bg-color-picker" value="#ffffff" title="배경색 선택">
+                </div>
+                <button id="manage-btn" title="프로젝트 관리">관리</button>
+                <button id="logout-btn">로그아웃</button>
+            </div>
+        </header>
+
+        <!-- Manage Projects Modal -->
+        <div id="manage-modal" class="modal hidden">
+            <div class="modal-content manage-content glass">
+                <div class="modal-header">
+                    <h2>프로젝트 관리</h2>
+                    <button class="close-btn"
+                        onclick="document.getElementById('manage-modal').classList.add('hidden')">&times;</button>
+                </div>
+                <div class="manage-table-container">
+                    <table id="manage-table">
+                        <thead>
+                            <tr>
+                                <th>이미지</th>
+                                <th>프로젝트명</th>
+                                <th>기간</th>
+                                <th>관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manage-project-list">
+                            <!-- Projects will be listed here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <section id="board" class="board-grid">
+            <!-- Stickers will be injected here -->
+        </section>
+    </main>
+
+    <!-- Project Add Modal -->
+    <div id="project-modal" class="modal hidden">
+        <div class="modal-content glass">
+            <span class="close-modal">&times;</span>
+            <h2>새 프로젝트 등록</h2>
+            <form id="project-form">
+                <div class="source-selector">
+                    <button type="button" class="source-tab active" data-source="file">파일 업로드</button>
+                    <button type="button" class="source-tab" data-source="url">이미지 URL</button>
+                    <button type="button" class="source-tab" data-source="emoji">이모지</button>
+                    <button type="button" class="source-tab" data-source="text">텍스트</button>
+                </div>
+
+                <!-- File Source -->
+                <div id="source-file" class="source-content">
+                    <div class="input-group">
+                        <label for="proj-image">스티커 이미지</label>
+                        <input type="file" id="proj-image" accept="image/*">
+                    </div>
+                </div>
+
+                <!-- URL Source -->
+                <div id="source-url" class="source-content hidden">
+                    <div class="input-group">
+                        <label for="proj-url">이미지 주소 (URL)</label>
+                        <input type="url" id="proj-url" placeholder="https://example.com/image.jpg">
+                    </div>
+                </div>
+
+                <!-- Emoji Source -->
+                <div id="source-emoji" class="source-content hidden">
+                    <div class="input-group">
+                        <label>이모지 선택 또는 입력</label>
+                        <div class="emoji-preset-panel">
+                            <span>✈️</span><span>💰</span><span>🏠</span><span>🔥</span><span>🏆</span><span>💪</span><span>🌟</span><span>❤️</span><span>📈</span><span>💻</span>
+                        </div>
+                        <div class="emoji-picker-row">
+                            <input type="text" id="proj-emoji" placeholder="😊" maxlength="2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Source -->
+                <div id="source-text" class="source-content hidden">
+                    <div class="input-group">
+                        <label>텍스트 스티커</label>
+                        <div class="text-sticker-row">
+                            <textarea id="proj-text-content" placeholder="나를 자극하는 한마디"></textarea>
+                            <input type="color" id="proj-text-color" value="#1e293b">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="proj-name" placeholder="프로젝트명 (스티커 이름)" required>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>시작일</label>
+                        <input type="date" id="proj-start" required>
+                    </div>
+                    <div class="input-group">
+                        <label>종료일</label>
+                        <input type="date" id="proj-end" required>
+                    </div>
+                </div>
+                <div class="input-group checkbox-group">
+                    <input type="checkbox" id="proj-year-long">
+                    <label for="proj-year-long">올해 내내 (2026.01.01 ~ 12.31)</label>
+                </div>
+                <div class="input-group">
+                    <textarea id="proj-goal" placeholder="목표를 입력하세요" required></textarea>
+                </div>
+                <button type="submit" class="submit-btn">등록하기</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Detail Modal -->
+    <div id="detail-modal" class="modal hidden">
+        <div class="modal-content glass">
+            <span class="close-modal">&times;</span>
+            <div id="detail-header">
+                <div class="title-row">
+                    <h2 id="detail-title">프로젝트명</h2>
+                    <button id="delete-project-btn" class="icon-btn delete-btn" title="프로젝트 삭제">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M3 6h18v2H3V6zm2 3h14v11a2 2 0 01-2 2H7a2 2 0 01-2-2V9zm3 3v6h2v-6H8zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM9 4V2h6v2h5v2H4V4h5z" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="detail-period-container">
+                    <div id="detail-period-display">
+                        <span id="detail-period-text">2026.01.01 ~ 2026.12.31</span>
+                        <button id="show-edit-dates-btn" class="text-link-btn">기간 변경</button>
+                    </div>
+
+                    <div id="detail-edit-section" class="hidden">
+                        <div class="detail-edit-dates">
+                            <div class="input-row compact">
+                                <input type="date" id="edit-proj-start">
+                                <span>~</span>
+                                <input type="date" id="edit-proj-end">
+                            </div>
+                            <div class="edit-actions">
+                                <div class="input-group checkbox-group">
+                                    <input type="checkbox" id="edit-proj-year-long">
+                                    <label for="edit-proj-year-long">올해 내내</label>
+                                </div>
+                                <div class="edit-btn-group">
+                                    <button id="cancel-dates-btn" class="mini-btn outline">취소</button>
+                                    <button id="save-dates-btn" class="mini-btn">저장</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p id="detail-goal">목표내용</p>
+            </div>
+
+            <div class="todo-section">
+                <h3>할 일 (To-Do)</h3>
+                <div class="todo-input-group">
+                    <input type="text" id="new-todo" placeholder="새로운 할 일 추가">
+                    <button id="add-todo-btn">추가</button>
+                </div>
+                <ul id="todo-list">
+                    <!-- Todo items will be injected here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
